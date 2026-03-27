@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, TouchableOpacity, Linking } from 'react-
 import { Message } from '../../types/message.types';
 import { Colors } from '../../constants/Colors';
 import { formatTime } from '../../utils/formatDate';
+import ProfileCard from './ProfileCard';
 
 interface MessageBubbleProps {
   message: Message;
@@ -22,6 +23,26 @@ export default function MessageBubble({
       Linking.openURL(message.file_url);
     }
   };
+
+   const profileCardData = (() => {
+    try {
+      const parsed = JSON.parse(message.content);
+      if (parsed.type === 'profile_card') return parsed;
+    } catch {}
+    return null;
+  })();
+
+  // If it's a profile card, render completely outside the bubble
+  if (profileCardData) {
+    return (
+      <View style={[styles.messageContainer, isMyMessage ? styles.myMessage : styles.otherMessage]}>
+        <ProfileCard data={profileCardData} />
+        <Text style={[styles.messageTime, isMyMessage ? styles.myMessageTime : styles.otherMessageTime, { marginTop: 4, marginHorizontal: 4 }]}>
+          {formatTime(message.created_at)}
+        </Text>
+      </View>
+    );
+  }
 
   const renderContent = () => {
     switch (message.message_type) {
@@ -72,7 +93,7 @@ export default function MessageBubble({
         );
 
       default:
-        return (
+          return (
           <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.otherMessageText]}>
             {message.content}
           </Text>

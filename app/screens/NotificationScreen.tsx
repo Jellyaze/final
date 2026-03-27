@@ -98,7 +98,7 @@ export default function NotificationScreen({ navigation }: any) {
   await addDismissedId(id);
 
   // optional: still try backend delete
-  await dismissNotification(id);
+  await dismissNotification(id, user?.id);
 };
 
   const renderNotification = ({ item }: { item: Notification }) => (

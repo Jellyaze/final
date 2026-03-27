@@ -14,7 +14,7 @@ import {
   Keyboard,
   Animated
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -40,6 +40,7 @@ import { supabase } from '../../config/supabase';
 import { deleteConversationForMe, deleteConversationForEveryone } from '../../services/messageService';
 
 export default function ChatScreen({ route, navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { conversationId, otherUserId } = route.params;
   const { user } = useAuth() as any;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -55,30 +56,42 @@ export default function ChatScreen({ route, navigation }: any) {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [idModalVisible, setIdModalVisible] = useState(false);
   const [idProfile, setIdProfile] = useState<{ front_id_image_url?: string; back_id_image_url?: string } | null>(null);
+  const [otherProfile, setOtherProfile] = useState<{ full_name?: string | null; photo_url?: string | null; profile_image_url?: string | null } | null>(null);
 
   useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
     const keyboardWillShow = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      showEvent,
       (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
+        setKeyboardHeight(e.endCoordinates.height + insets.bottom);
       }
     );
     const keyboardWillHide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      hideEvent,
       () => {
         setKeyboardHeight(0);
       }
     );
 
+    const keyboardDidChangeFrame = Keyboard.addListener('keyboardDidChangeFrame', (e) => {
+      if (e.endCoordinates.height > 0) {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    });
+
     return () => {
       keyboardWillShow.remove();
       keyboardWillHide.remove();
+      keyboardDidChangeFrame.remove();
     };
   }, []);
 
   useEffect(() => {
     loadMessages();
     markAsRead();
+    loadOtherProfile();
 
     const messageChannel = subscribeToMessages(conversationId, (newMessage) => {
       setMessages((prev) => [...prev, newMessage]);
@@ -104,6 +117,18 @@ export default function ChatScreen({ route, navigation }: any) {
       }
     };
   }, [conversationId]);
+
+  const loadOtherProfile = async () => {
+    if (!otherUserId) return;
+    const { data, error } = await supabase
+      .from('app_d56ee_profiles')
+      .select('full_name, photo_url, profile_image_url')
+      .eq('auth_id', otherUserId)
+      .maybeSingle();
+    if (!error) {
+      setOtherProfile(data || null);
+    }
+  };
 
   const loadMessages = async () => {
     const { data, error } = await getMessages(conversationId);
@@ -224,6 +249,11 @@ export default function ChatScreen({ route, navigation }: any) {
   const handleMessageLongPress = (message: Message) => {
     if (message.sender_id !== user?.id) return;
 
+    try {
+    const parsed = JSON.parse(message.content);
+    if (parsed.type === 'profile_card') return;
+  } catch {}
+
     Alert.alert(
       'Message Options',
       '',
@@ -252,7 +282,7 @@ export default function ChatScreen({ route, navigation }: any) {
                   text: 'Delete',
                   style: 'destructive',
                   onPress: async () => {
-                    const { error } = await deleteMessage(message.id);
+                    const { error } = await deleteMessage(message.id, user?.id);
                     if (!error) {
                       setMessages(prev => prev.filter(m => m.id !== message.id));
                     } else {
@@ -292,36 +322,37 @@ export default function ChatScreen({ route, navigation }: any) {
   try {
     const { data: profile, error } = await supabase
       .from('app_d56ee_profiles')
-      .select('front_id_image_url, back_id_image_url')
+      .select(`
+        full_name,
+        gender,
+        age,
+        contact_number,
+        photo_url,
+        profile_image_url,
+        front_id_image_url,
+        back_id_image_url
+      `)
       .eq('auth_id', user.id)
       .maybeSingle();
 
-    if (error) { Alert.alert('Error', error.message); return; }
-    if (!profile) { Alert.alert('Error', 'Profile not found.'); return; }
+    if (error) { 
+      Alert.alert('Error', error.message); 
+      return; 
+    }
 
-    const hasFront = profile.front_id_image_url;
-    const hasBack = profile.back_id_image_url;
-
-    if (!hasFront && !hasBack) {
-      // No ID uploaded yet — keep native alert for this one since it redirects to gallery
-      Alert.alert(
-        'No ID Found',
-        'You have not uploaded your ID yet. Would you like to upload from your gallery?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Upload from Gallery', onPress: pickIDFromGallery },
-        ]
-      );
-      return;
+    if (!profile) { 
+      Alert.alert('Error', 'Profile not found.'); 
+      return; 
     }
 
     setIdProfile(profile);
     setIdModalVisible(true);
-  } catch (error) {
-    console.error('Error fetching profile:', error);
-    Alert.alert('Error', 'Failed to retrieve ID information');
-  }
-};
+
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      Alert.alert('Error', 'Failed to retrieve profile');
+    }
+  };
 
   const sendStoredID = async (idUrl: string, side: 'front' | 'back') => {
     Alert.alert(
@@ -448,7 +479,47 @@ export default function ChatScreen({ route, navigation }: any) {
     }
   };
 
-  
+  const sendProfileCard = async () => {
+  if (!user || !idProfile) return;
+
+  console.log('Profile data:', JSON.stringify(idProfile, null, 2));
+  const profileCardContent = JSON.stringify({
+    type: 'profile_card',
+    full_name: (idProfile as any).full_name || 'Unknown',
+    gender: (idProfile as any).gender || 'N/A',
+    age: (idProfile as any).age || 'N/A',
+    contact_number: (idProfile as any).contact_number || 'N/A',
+    photo_url: (idProfile as any).profile_image_url || (idProfile as any).photo_url || null,
+    role: (idProfile as any).role || 'Student',
+  });
+
+  Alert.alert(
+    'Send Profile Card',
+    'Are you sure you want to share your profile information?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Send',
+        onPress: async () => {
+          setLoading(true);
+          const { error } = await sendMessage(
+            conversationId,
+            user.id,
+            profileCardContent,
+            'text',
+          );
+          setLoading(false);
+
+          if (error) {
+            Alert.alert('Error', 'Failed to send profile card');
+          } else {
+            setTimeout(() => flatListRef.current?.scrollToEnd(), 100);
+          }
+        },
+      },
+    ]
+  );
+};
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -463,11 +534,26 @@ export default function ChatScreen({ route, navigation }: any) {
 
         <View style={styles.headerCenter}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
+            {otherProfile?.profile_image_url || otherProfile?.photo_url ? (
+              <Image
+                source={{ uri: (otherProfile.profile_image_url || otherProfile.photo_url) as string }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarText}>
+                {otherProfile?.full_name
+                  ? otherProfile.full_name.charAt(0).toUpperCase()
+                  : otherUserId
+                  ? otherUserId.charAt(0).toUpperCase()
+                  : 'U'}
+              </Text>
+            )}
           </View>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>Chat</Text>
-            <Text style={styles.headerSubtitle}>User {otherUserId.substring(0, 8)}</Text>
+            <Text style={styles.headerTitle}>{otherProfile?.full_name || 'Chat'}</Text>
+            <Text style={styles.headerSubtitle}>
+              {otherProfile?.full_name ? 'Active conversation' : `User ${otherUserId.substring(0, 8)}`}
+            </Text>
           </View>
         </View>
 
@@ -480,16 +566,18 @@ export default function ChatScreen({ route, navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <View 
+        style={[styles.content, {flex: 1}]}
+        >
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          contentContainerStyle={[
-          styles.messagesList,
-          { paddingBottom: keyboardHeight }
-          ]}
+          // contentContainerStyle={[
+          // styles.messagesList,
+          // { paddingBottom: keyboardHeight }
+          // ]}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
           ListFooterComponent={isTyping ? <TypingIndicator /> : null}
           showsVerticalScrollIndicator={false}
@@ -510,7 +598,14 @@ export default function ChatScreen({ route, navigation }: any) {
           </View>
         )}
 
-        <View style={[styles.inputContainer, { marginBottom: keyboardHeight > 0 ? keyboardHeight + 15 : 0}]}>
+        <View style={[
+          styles.inputContainer, 
+          { 
+            marginBottom: keyboardHeight > 0 
+            ? keyboardHeight
+            : insets.bottom
+          }]}>
+
           <TouchableOpacity
             style={styles.attachButton}
             onPress={() => setImagePickerVisible(true)}
@@ -681,7 +776,7 @@ export default function ChatScreen({ route, navigation }: any) {
                 </Text>
               </View>
             </TouchableOpacity>
-
+              
             {/* Cancel */}
             <TouchableOpacity
               style={styles.modalCancel}
@@ -717,7 +812,7 @@ export default function ChatScreen({ route, navigation }: any) {
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Choose which ID to send. This will be visible to the other person.
+              Choose which to send. This will be visible to the other person.
             </Text>
 
             {/* Front ID */}
@@ -798,6 +893,29 @@ export default function ChatScreen({ route, navigation }: any) {
               </TouchableOpacity>
             )}
 
+            <TouchableOpacity
+              style={styles.modalOption}
+              activeOpacity={0.8}
+              onPress={() => {
+                setIdModalVisible(false);
+                sendProfileCard();
+              }}
+            >
+              <View style={styles.modalOptionIcon}>
+                <Image
+                  source={require('../../assets/added/info-attach.png')}
+                  style={{ width: 25, height: 25 }}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.modalOptionText}>
+                <Text style={styles.modalOptionTitle}>Send Profile Card</Text>
+                <Text style={styles.modalOptionDesc}>
+                  Share your basic profile information.
+                </Text>
+              </View>
+            </TouchableOpacity>
+
             {/* Cancel */}
             <TouchableOpacity
               style={styles.modalCancel}
@@ -853,8 +971,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
   },
   avatarText: { fontSize: 20 },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   headerSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2, fontWeight: '500' },
@@ -869,7 +993,7 @@ const styles = StyleSheet.create({
   moreButtonText: { fontSize: 20, color: colors.textPrimary },
 
   content: { flex: 1 },
-  messagesList: { padding: 16, flexGrow: 1 },
+  messagesList: { flexGrow: 1 },
 
   editingBanner: {
     flexDirection: 'row',
@@ -886,8 +1010,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 45,  
+    paddingTop: 12, 
+    paddingBottom: 12,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -1039,3 +1163,4 @@ modalCancelText: {
   color: colors.textSecondary,
 },
 });
+

@@ -326,6 +326,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
         setLoading(false);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -379,6 +383,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setProfile(null);
         setLoading(false);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     });
 

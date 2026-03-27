@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { getConversations, subscribeToConversations } from '../../services/messageService';
@@ -84,6 +84,7 @@ export default function MessageListScreen({ navigation }: any) {
     const convo: any = item;
     const otherUserId = convo.user_low_id === user?.id ? convo.user_high_id : convo.user_low_id;
     const otherProfile = otherUserId ? userMap[otherUserId] : null;
+    const avatarUrl = otherProfile?.profile_image_url || otherProfile?.photo_url || null;
 
     return (
       <TouchableOpacity
@@ -97,14 +98,22 @@ export default function MessageListScreen({ navigation }: any) {
         activeOpacity={0.85}
       >
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {otherProfile?.full_name ? otherProfile.full_name.charAt(0).toUpperCase() : 'U'}
-          </Text>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>
+              {otherProfile?.full_name
+                ? otherProfile.full_name.charAt(0).toUpperCase()
+                : otherUserId
+                ? otherUserId.charAt(0).toUpperCase()
+                : 'U'}
+            </Text>
+          )}
         </View>
 
         <View style={styles.conversationContent}>
           <Text style={styles.conversationName}>
-            {otherProfile?.full_name || 'User'}
+            {otherProfile?.full_name || otherUserId || 'User'}
           </Text>
           <Text style={styles.lastMessage} numberOfLines={1}>
             {(item as any).last_message || 'No messages yet'}
@@ -209,6 +218,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   avatarText: {
     color: colors.primary,

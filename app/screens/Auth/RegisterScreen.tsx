@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View,
@@ -20,9 +20,10 @@ import { uploadImage } from '../../services/authService';
 import { colors } from '../../constants/Colors';
 import { validateEmail, validatePassword, validatePhoneNumber, validateRequired } from '../../utils/validation';
 import { supabase } from '../../config/supabase';
+import GoogleAuthBootstrap from '../../components/auth/GoogleAuthBootstrap';
 
 export default function RegisterScreen({ navigation }: any) {
-  const { signUp, signInWithGoogle, user, profile } = useAuth(); // added signInWithGoogle, user, profile
+  const { signUp, user, profile } = useAuth();
   
   const [loading, setLoading] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -59,6 +60,24 @@ export default function RegisterScreen({ navigation }: any) {
   const [oauthLoading, setOauthLoading] = useState(false); // Aly added
   const [isGoogleSignUp, setIsGoogleSignUp] = useState(false); // Aly added
 
+  const googleConfig = {
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+  };
+
+  const googleEnabled = Boolean(
+    googleConfig.androidClientId || googleConfig.iosClientId || googleConfig.clientId
+  );
+
+  const [googleRequest, setGoogleRequest] = useState<any>(null);
+  const [googlePromptAsync, setGooglePromptAsync] = useState<any>(null);
+
+  const handleGoogleReady = useCallback((request: any, promptAsync: any) => {
+    setGoogleRequest(request);
+    setGooglePromptAsync(() => promptAsync);
+  }, []);
+
   const navigateToLogin = () => {
     let current: any = navigation;
     while (current) {
@@ -76,23 +95,11 @@ export default function RegisterScreen({ navigation }: any) {
   // Aly added
   useEffect(() => {
     if (user && profile && isGoogleSignUp) {
-      //Name from profile
-      const googleName = profile.full_name ||
-                        user.user_metadata?.full_name ||
-                        user.user_metadata?.name ||
-                        '';
-      const googleEmail = user.email || '';
-
-      const googleImage = profile.profile_image_url ||
-                          user.user_metadata?.avatar_url ||
-                          user.user_metadata?.picture ||
-                          '';
-      
-      setFullName(googleName);
-      setEmail(googleEmail);
-      setProfileImage(googleImage);
+      // Skip manual registration after Google sign-in
+      setIsGoogleSignUp(false);
+      navigation.replace('Main');
     }
-  }, [user, profile, isGoogleSignUp]);
+  }, [user, profile, isGoogleSignUp, navigation]);
 
   const handleGoogleSignUp = async () => {
     try {
@@ -100,7 +107,31 @@ export default function RegisterScreen({ navigation }: any) {
     setOauthLoading(true);
     setIsGoogleSignUp(true);
 
-    const { error } = await signInWithGoogle();
+    if (!googleEnabled || !googlePromptAsync) {
+      Alert.alert('Google Sign Up Unavailable', 'Google sign-up is not configured yet.');
+      return;
+    }
+
+    if (!googleRequest) {
+      Alert.alert('Google Sign Up Failed', 'Google auth request is not ready');
+      return;
+    }
+
+    const result = await googlePromptAsync();
+    if (result.type !== 'success') {
+      return;
+    }
+
+    const idToken = result.params?.id_token;
+    if (!idToken) {
+      Alert.alert('Google Sign Up Failed', 'Missing ID token');
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: idToken,
+    });
 
     console.log('Google sign up completed, error:', error);
 
@@ -121,6 +152,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
     
     console.log('Google sign up successful');
+    navigation.replace('Main');
   } catch (error: any) {
     console.error('Google sign up exception:', error);
     setIsGoogleSignUp(false);
@@ -338,6 +370,7 @@ export default function RegisterScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {googleEnabled && <GoogleAuthBootstrap config={googleConfig} onReady={handleGoogleReady} />}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}

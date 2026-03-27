@@ -126,10 +126,16 @@ export const subscribeToNotifications = (
     .subscribe();
 };
 
-export const dismissNotification = async (notificationId: string) => {
-  const { error } = await supabase
-    .from('app_3f92f_notifications') 
+export const dismissNotification = async (notificationId: string, userId?: string) => {
+  const query = supabase
+    .from('app_3f92f_notifications')
     .delete()
     .eq('id', notificationId);
+
+  if (userId) {
+    query.eq('user_id', userId);
+  }
+
+  const { error } = await query;
   return { error };
 };

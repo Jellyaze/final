@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../../constants/Colors';
 import PrimaryButton from '../../components/ui/PrimaryButton';
+import ImagePickerModal from '../../components/messaging/ImagePickerModal';
 
 const codeFromSeed = (seed: string) => {
   let hash = 5381;
@@ -19,28 +20,51 @@ export default function ConfirmClaimScreen({ route, navigation }: any) {
   const [claimImage, setClaimImage] = useState<string | null>(null);
   const [returnCodeInput, setReturnCodeInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [imagePickerVisible, setImagePickerVisible] = useState(false);
+
+  const handleImageSelected = (uri: string) => {
+  setClaimImage(uri);
+  };
 
   const claimCode = useMemo(() => codeFromSeed(`${claimId}:claim`), [claimId]);
   const returnCode = useMemo(() => codeFromSeed(`${claimId}:return`), [claimId]);
 
-  const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+const openGallery = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Permission to access gallery is required!');
-      return;
-    }
+  if (!permission.granted) {
+    Alert.alert('Permission Required', 'Permission to access gallery is required!');
+    return;
+  }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      allowsEditing: true,
-    });
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.8,
+    allowsEditing: true,
+  });
 
-    if (!result.canceled) {
-      setClaimImage(result.assets[0].uri);
-    }
-  };
+  if (!result.canceled) {
+    setClaimImage(result.assets[0].uri);
+  }
+};
+
+const openCamera = async () => {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+  if (!permission.granted) {
+    Alert.alert('Permission Required', 'Permission to access camera is required!');
+    return;
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    quality: 0.8,
+    allowsEditing: true,
+  });
+
+  if (!result.canceled) {
+    setClaimImage(result.assets[0].uri);
+  }
+};
 
   const handleComplete = async () => {
     if (!claimImage) {
@@ -77,13 +101,13 @@ export default function ConfirmClaimScreen({ route, navigation }: any) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.noteContainer}>
           <Text style={styles.noteText}>
-            Upload a clear photo of the item, then enter the owner's code to complete the claim.
+            Upload a clear photo of the item, then enter the finder's code to complete the claim.
           </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Upload Image</Text>
-          <TouchableOpacity style={styles.imageUpload} onPress={pickImage} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.imageUpload} onPress={() => setImagePickerVisible(true)} activeOpacity={0.85}>
             {claimImage ? (
               <Image source={{ uri: claimImage }} style={styles.uploadedImage} />
             ) : (
@@ -96,7 +120,7 @@ export default function ConfirmClaimScreen({ route, navigation }: any) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Enter Return Code (from owner)</Text>
+          <Text style={styles.sectionTitle}>Enter Return Code (from finder)</Text>
           <View style={styles.codeInputContainer}>
             <TextInput
               style={styles.codeInput}
@@ -118,7 +142,7 @@ export default function ConfirmClaimScreen({ route, navigation }: any) {
           <View style={styles.generatedCodeContainer}>
             <Text style={styles.generatedCode}>{claimCode}</Text>
             <Text style={styles.timerText}>
-              Share this code with the owner to verify your claim.
+              Share this code with the finder to complete your claim.
             </Text>
           </View>
         </View>
@@ -130,6 +154,12 @@ export default function ConfirmClaimScreen({ route, navigation }: any) {
           disabled={loading}
         />
       </ScrollView>
+
+      <ImagePickerModal
+        visible={imagePickerVisible}
+        onClose={() => setImagePickerVisible(false)}
+        onImageSelected={handleImageSelected}
+      />
     </SafeAreaView>
   );
 }
@@ -264,6 +294,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 10,
     fontWeight: '500',
+    textAlign: 'center',
   },
   completeButton: {
     marginTop: 8,

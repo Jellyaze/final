@@ -210,7 +210,7 @@ export default function AdvancedSearchScreen({ navigation }: any) {
             onChange={(item) => setFilters(prev => ({ ...prev, category: item.value }))}
           />
         </View>
-
+        
         {itemType === 'pet' && (
             <View style={styles.breedContainer}>
               <Text style={styles.breedLabel}>
@@ -463,6 +463,8 @@ const styles = StyleSheet.create({
     },
     breedContainer: {
     marginTop: 16,
+    marginLeft: 20,
+    marginRight: 20
   },
   breedLabel: {
     fontSize: 14,

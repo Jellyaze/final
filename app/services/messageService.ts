@@ -82,8 +82,18 @@ export const getConversations = async (userId: string): Promise<{ data: Conversa
       .from('app_3f92f_conversations')
       .select('*')
       .or(`user_low_id.eq.${userId},user_high_id.eq.${userId}`)
-      // .is('deleted_at', null) // filter out deleted
+      .is('deleted_at', null) // filter out deleted
       .order('last_message_at', { ascending: false });
+
+    // If deleted_at doesn't exist yet, fall back to unfiltered query
+    if (error && /column.*deleted_at/i.test(error.message || '')) {
+      const { data: fallback, error: fallbackErr } = await supabase
+        .from('app_3f92f_conversations')
+        .select('*')
+        .or(`user_low_id.eq.${userId},user_high_id.eq.${userId}`)
+        .order('last_message_at', { ascending: false });
+      return { data: fallback || [], error: fallbackErr };
+    }
 
     return { data: data || [], error };
   } catch (error) {
@@ -270,12 +280,18 @@ export const editMessage = async (
   }
 };
 
-export const deleteMessage = async (messageId: string): Promise<{ error: any }> => {
+export const deleteMessage = async (messageId: string, userId?: string): Promise<{ error: any }> => {
   try {
-    const { error } = await supabase
+    const query = supabase
       .from('app_3f92f_messages')
       .delete()
       .eq('id', messageId);
+
+    if (userId) {
+      query.eq('sender_id', userId);
+    }
+
+    const { error } = await query;
 
     return { error };
   } catch (error) {

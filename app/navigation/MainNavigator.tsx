@@ -13,7 +13,9 @@ import SettingsScreen from '../screens/Profile/SettingsScreen';
 import MapCreatePost from '../screens/Posts/Maps/MapCreatePost';
 import MapViewPost from '../screens/Posts/Maps/MapViewPost';
 import AdvancedSearchScreen from '../screens/Search/AdvancedSearchScreen';
+
 import SearchResultsScreen from '../screens/Search/SearchResultsScreen';
+
 import { MainStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<MainStackParamList>();

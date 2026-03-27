@@ -50,7 +50,8 @@ export default function ImagePickerModal({ visible, onClose, onImageSelected }: 
     });
 
     if (!result.canceled && result.assets[0]) {
-      setSelectedImage(result.assets[0].uri);
+    onImageSelected(result.assets[0].uri);
+    onClose();
     }
   };
 

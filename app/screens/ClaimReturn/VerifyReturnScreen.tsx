@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 10,
     fontWeight: '500',
+    textAlign: 'center'
   },
   verifyButton: {
     marginTop: 8,

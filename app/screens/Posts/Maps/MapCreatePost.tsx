@@ -110,8 +110,12 @@ export default function MapCreatePost({ navigation, route }: MapCreatePostProps)
 
     if (onLocationSelect) {
       onLocationSelect(selectedLocation);
+      navigation.goBack();
+      return;
     }
-    navigation.goBack();
+
+    // Fallback: pass location back to CreatePost via route params
+    navigation.navigate('CreatePost', { selectedLocation });
   };
 
   return (

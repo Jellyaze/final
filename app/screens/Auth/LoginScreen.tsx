@@ -30,6 +30,7 @@ export default function LoginScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<null | 'google'>(null);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const showGoogle = false;
 
   const slideAnim = useRef(new Animated.Value(height)).current;
   const pan = useRef(new Animated.ValueXY()).current;
@@ -157,23 +158,25 @@ export default function LoginScreen({ navigation }: any) {
         <View style={styles.panelHandle} />
         <Text style={styles.panelTitle}>Create an account with</Text>
 
-        <TouchableHighlight
-          onPress={handleGoogle}
-          underlayColor="transparent"
-          disabled={oauthLoading !== null}
-        >
-          <View style={[styles.optionBtn, oauthLoading === 'google' && styles.optionDisabled]}>
-            {oauthLoading === 'google' ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Image
-                source={require('../../assets/googleoption.png')}
-                style={styles.optionImg}
-                resizeMode="contain"
-              />
-            )}
-          </View>
-        </TouchableHighlight>
+        {showGoogle && (
+          <TouchableHighlight
+            onPress={handleGoogle}
+            underlayColor="transparent"
+            disabled={oauthLoading !== null}
+          >
+            <View style={[styles.optionBtn, oauthLoading === 'google' && styles.optionDisabled]}>
+              {oauthLoading === 'google' ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Image
+                  source={require('../../assets/googleoption.png')}
+                  style={styles.optionImg}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+          </TouchableHighlight>
+        )}
 
         <TouchableHighlight
           onPress={() => navigation.navigate('Register')}

@@ -8,16 +8,23 @@ import NotificationScreen from '../screens/NotificationScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 import { BottomTabParamList } from './types';
 import { Colors } from '../constants/Colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 export default function BottomTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       id="BottomTabs"
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: {
+          ...styles.tabBar,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom || 8,
+        },
         tabBarShowLabel: false,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.gray,
@@ -66,7 +73,7 @@ export default function BottomTabs() {
           tabBarIcon: ({ focused }) => (
             <Image
               source={require('../assets/added/notif.png')}
-              style={[styles.icon, focused && styles.iconFocused]}
+              style={[{width: 23, length: 23}, focused && styles.iconFocused]}
               resizeMode='contain'
             />
           ),
@@ -90,12 +97,11 @@ export default function BottomTabs() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 85,
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.lightGray,
     paddingBottom: 3,
-    paddingTop: 2
+    paddingTop: 3
   },
   icon: {
     width: 30,

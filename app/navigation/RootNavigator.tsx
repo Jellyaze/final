@@ -29,66 +29,71 @@ export default function RootNavigator() {
 
       setProfileLoading(true);
 
-      // ✅ retry once (fixes race condition after email confirm/login)
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error } = await supabase
-          .from('app_d56ee_profiles')
-          .select('id, full_name, label, age, gender, contact_number')
-          .eq('auth_id', user.id)
-          .limit(1)
-          .maybeSingle();
+      try {
+        // retry once (fixes race condition after email confirm/login)
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const { data, error } = await supabase
+            .from('app_d56ee_profiles')
+            .select('id, full_name, label, age, gender, contact_number')
+            .eq('auth_id', user.id)
+            .limit(1)
+            .maybeSingle();
 
+          if (!mounted) return;
+
+          if (!error && data) {
+            const incomplete =
+              !data.full_name ||
+              !data.label ||
+              !data.age ||
+              !data.gender ||
+              !data.contact_number;
+
+            setNeedsProfileSetup(incomplete);
+            return;
+          }
+
+          if (error) {
+            console.error('Profile check error (auth_id):', error);
+          }
+
+          const { data: dataById, error: errorById } = await supabase
+            .from('app_d56ee_profiles')
+            .select('id, full_name, label, age, gender, contact_number')
+            .eq('id', user.id)
+            .limit(1)
+            .maybeSingle();
+
+          if (!mounted) return;
+
+          if (!errorById && dataById) {
+            const incomplete =
+              !dataById.full_name ||
+              !dataById.label ||
+              !dataById.age ||
+              !dataById.gender ||
+              !dataById.contact_number;
+
+            setNeedsProfileSetup(incomplete);
+            return;
+          }
+
+          // wait before retry
+          if (attempt === 0) {
+            await new Promise((res) => setTimeout(res, 800));
+          }
+        }
+
+        // after retry, still no profile = needs setup
         if (!mounted) return;
-
-        if (!error && data) {
-          const incomplete =
-            !data.full_name ||
-            !data.label ||
-            !data.age ||
-            !data.gender ||
-            !data.contact_number;
-
-          setNeedsProfileSetup(incomplete);
+        setNeedsProfileSetup(true);
+      } catch (error) {
+        console.error('Profile check failed:', error);
+      } finally {
+        if (mounted) {
           setProfileLoading(false);
-          return;
-        }
-
-        if (error) {
-          console.error('Profile check error (auth_id):', error);
-        }
-
-        const { data: dataById, error: errorById } = await supabase
-          .from('app_d56ee_profiles')
-          .select('id, full_name, label, age, gender, contact_number')
-          .eq('id', user.id)
-          .limit(1)
-          .maybeSingle();
-
-        if (!mounted) return;
-
-        if (!errorById && dataById) {
-          const incomplete =
-            !dataById.full_name ||
-            !dataById.label ||
-            !dataById.age ||
-            !dataById.gender ||
-            !dataById.contact_number;
-
-          setNeedsProfileSetup(incomplete);
-          setProfileLoading(false);
-          return;
-        }
-
-        // wait before retry
-        if (attempt === 0) {
-          await new Promise((res) => setTimeout(res, 800));
         }
       }
-
-      // after retry, still no profile = needs setup
-      if (!mounted) return;
-      setNeedsProfileSetup(true);
-      setProfileLoading(false);
     };
 
     checkProfile();

@@ -6,18 +6,17 @@
     "scheme": "seeker",
     "plugins": [
       "expo-web-browser",
-      "expo-splash-screen",
-      [
-        "react-native-maps",
-        {
-          "androidGoogleMapsApiKey": "AIzaSyBaE-Vx2GRLKx3iZYlPmT4IcYapetZNvIU"
-        }
-      ]
+      "expo-splash-screen"
     ],
     "android": {
       "package": "com.jellyaze.maginghotdog",
       "edgeToEdgeEnabled": true,
-      "permissions": ["NOTIFICATIONS"]
+      "permissions": ["NOTIFICATIONS"],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBaE-Vx2GRLKx3iZYlPmT4IcYapetZNvIU"
+        }
+      }
     },
     "runtimeVersion": "1.0.0",
     "extra": {
